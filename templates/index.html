@@ -1,0 +1,122 @@
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 1300px;
+    }
+    th {
+        background-color: #f2f2f2;
+        text-align: left;
+    }
+    td, th {
+        padding: 10px;
+        border: 1px solid #ccc;
+    }
+</style>
+
+    <title>AI Support Assistant</title>
+</head>
+<body>
+    <h1>AI Support Assistant</h1>
+    <form id="ai-form">
+    <label for="message">Message:</label><br>
+    <textarea id="message" rows="4" cols="50" placeholder="Enter customer message..."></textarea><br><br>
+
+    <label><input type="radio" name="mode" value="single" checked> One Model</label>
+    <label><input type="radio" name="mode" value="compare"> Compare All Models</label><br><br>
+
+    <div id="model-select">
+        <label for="model">Model:</label><br>
+        <select id="model">
+            <option value="llama3">Llama3</option>
+            <option value="granite">Granite</option>
+            <option value="mixtral">Mixtral</option>
+        </select><br><br>
+    </div>
+
+    <input type="submit" value="Submit">
+</form>
+
+<br>
+<div id="response"></div>
+
+<script>
+document.querySelectorAll('input[name="mode"]').forEach((el) => {
+    el.addEventListener('change', () => {
+        const isCompare = document.querySelector('input[name="mode"]:checked').value === 'compare';
+        document.getElementById('model-select').style.display = isCompare ? 'none' : 'block';
+    });
+});
+
+document.getElementById('ai-form').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const message = document.getElementById('message').value;
+    const model = document.getElementById('model').value;
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+
+    const url = mode === 'compare' ? '/compare' : '/generate';
+    const body = mode === 'compare' ? { message } : { message, model };
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(response => response.json())
+    .then(data => {
+        let html = '';
+        if (mode === 'compare') {
+            html += `
+                <table border="1" cellpadding="6" cellspacing="0" style="margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Category</th>
+                            <th>Sentiment</th>
+                            <th>Summary</th>
+                            <th>Next Step</th>
+                            <th>Response Time (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            for (const [model, result] of Object.entries(data)) {
+                if (result.error) {
+                    html += `<tr><td colspan="5" style="color:red;">${model.toUpperCase()} ERROR: ${result.error}</td></tr>`;
+                } else {
+                    html += `
+                        <tr>
+                            <td>${model}</td>
+                            <td>${result.category}</td>
+                            <td>${result.sentiment}</td>
+                            <td>${result.summary}</td>
+                            <td>${result.next_step}</td>
+                            <td>${result.duration ?? '-'}</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+        } else {
+            html += data.error
+                ? `<pre style="color:red;">${data.error}</pre>`
+                : `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+        document.getElementById('response').innerHTML = html;
+    });
+});
+</script>
+
+</body>
+</html>
